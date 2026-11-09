@@ -110,6 +110,41 @@ def test_cal_similarity_ratio_empty_source():
     assert classifier.cal_similarity_ratio([], [['a']]) == 0.0
 
 
+def test_cal_similarity_ratio_bigram_requires_whole_ngram():
+    source_hashes = [('a b', [1]), ('b c', [2])]
+    assert classifier.cal_similarity_ratio(source_hashes, [['a', 'z']]) == 0.0
+
+
+def test_cal_similarity_ratio_bigram_containment():
+    source_hashes = [('a b', [1]), ('b c', [2])]
+    per = classifier.cal_similarity_ratio(source_hashes, [['q', 'a', 'b']])
+    assert per == pytest.approx(50.0)
+
+
+def test_cal_similarity_ratio_bigram_does_not_span_added_lines():
+    source_hashes = [('a b', [1])]
+    assert classifier.cal_similarity_ratio(source_hashes, [['a'], ['b']]) == 0.0
+
+
+def test_cal_similarity_ratio_ignores_global_ngram_size(monkeypatch):
+    monkeypatch.setattr(common, 'ngram_size', 1)
+    source_hashes = [('a b', [1]), ('b c', [2])]
+    assert classifier.cal_similarity_ratio(source_hashes, [['a', 'z']]) == 0.0
+
+
+def test_cal_similarity_ratio_mixed_ngram_lengths():
+    # patchLoader shrinks common.ngram_size for short hunks, so lengths can mix.
+    source_hashes = [('a', [1]), ('a b', [2]), ('c d', [3])]
+    per = classifier.cal_similarity_ratio(source_hashes, [['a', 'b']])
+    assert per == pytest.approx((2 / 3) * 100)
+
+
+def test_cal_similarity_ratio_empty_ngram_never_matches():
+    # A deletion-only hunk drives common.ngram_size to 0, producing '' source n-grams.
+    source_hashes = [('', [0]), ('b', [1])]
+    assert classifier.cal_similarity_ratio(source_hashes, [['a']]) == 0.0
+
+
 def test_process_patch_monkeypatched(monkeypatch):
     # Monkeypatch PatchLoader and SourceLoader used in classifier
     class DummyPatch:

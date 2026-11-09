@@ -185,16 +185,23 @@ def find_hunk_matches_w_important_hash(match_items: Dict[Any, Any], _type: str, 
 
 
 def cal_similarity_ratio(source_hashes: List[Tuple[str, List[int]]], added_lines_hashes: List[List[str]]) -> float:
-    """Calculate similarity ratio between source hashes and added lines hashes.
+    """Return the percentage of source n-grams that also occur in the added lines.
+
+    Each source n-gram is compared against added-line n-grams of the same length,
+    so the result is n-gram containment for any n-gram size.
     """
-    added_tokens = {token for line in added_lines_hashes for token in line}
     source_ngrams = {ngram for ngram, _ in source_hashes}
     if not source_ngrams:
         return 0.0
 
-    matching_ngrams = {
-        ngram
-        for ngram in source_ngrams
-        if added_tokens.intersection(ngram.split())
+    # n is taken per n-gram because patchLoader shrinks common.ngram_size (to 0 for deletion-only hunks).
+    sizes = {len(ngram.split()) for ngram in source_ngrams} - {0}
+    added_ngrams = {
+        ' '.join(line[i:i + n])
+        for n in sizes
+        for line in added_lines_hashes
+        for i in range(len(line) - n + 1)
     }
+
+    matching_ngrams = source_ngrams & added_ngrams
     return (len(matching_ngrams) / len(source_ngrams)) * 100
